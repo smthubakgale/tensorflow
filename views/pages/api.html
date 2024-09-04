@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">  
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+</head>   
+
+<body>
+<style>
+/* width */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: #f1f1f1; 
+}
+ 
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #888; 
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #555; 
+}
+  main{
+    width:calc(100% - 40px);
+    margin:auto;
+    padding-top:10px;
+    padding-bottom:10px;
+  }
+  .fm{
+    border:solid #E7E9EB 1.5px;
+    margin-bottom:10px;
+    padding:15px;
+  }
+</style>
+
+  <main> 
+    <div class="fm">
+      <div>
+        Post Data
+      </div>
+      <div>
+        <div class="mb-3 mt-3">
+        <label for="current">Current : </label>
+        <input type="number" min="0" value="0" class="form-control" id="current" placeholder="Enter current value" name="current">
+      </div>
+      <div class="mb-3">
+        <label for="voltage">Voltage:</label>
+        <input type="number" min="0" value="0" class="form-control" id="voltage" placeholder="Enter voltage" name="voltage">
+      </div> 
+      <button id="sub1" type="submit" class="btn btn-primary">Submit</button>
+      </div>
+    </div>
+    <div class="fm">
+      <div>
+        <u> Get Data </u>
+      </div>
+      <div> 
+        <br/>
+        live : <input style="margin-left:10px;" id="lv" onchange="live(this)" type="checkbox" />
+        <input id="rfr" onchange="rdft(this)" style="margin-left:10px; width:60px; text-align:center;" type="number" min="1" value="1000" title="Refresh time ( milli seconds)">
+        <input onchange="rdd(this)" style="margin-left:10px; width:60px; text-align:center;" type="number" min="1" value="1" title="Past Value">
+        <select id="pst" title="Past Unit" onchange="getTime(this)" style="margin-left:10px">
+          <option> minute </option>
+          <option> hour </option>
+          <option> day </option>
+          <option> week </option>
+          <option> month </option>
+          <option> year </option>
+        </select>
+        <span style="margin-left:10px;" id="km"></span>
+        <br/><br/>
+        time filter : <input style="margin-left:10px;" id="tm" type="checkbox" />
+        <input id="ss1" style="margin-left:10px;" type="datetime-local" title="Start Time">
+        <input id="ss2" style="margin-left:10px;" type="datetime-local" title="End Time">
+        <br/><br/>
+        <button id="gt1" type="submit" class="btn btn-primary"> GET </button>
+        <br/>
+        <div id="get"></div>
+        <div style="height:50vh"></div>
+    </div>
+    </div>  
+  </main>
+
+  <script>
+    var writeKey = window.parent.writeKey;
+    var readKey = window.parent.readKey;
+    var channel_Id = window.parent.channel_Id;
+    var rdC = -1;
+    var tcR;
+    var psR;
+    var qt = 1;
+
+    //console.log(writeKey);
+    //console.log(readKey);
+
+    $(window).on("load",function()
+    {
+      var tcp = false;
+
+      window["rdft"] = function(ts)
+      {
+         clearInterval(tcR);
+
+        tcf();
+      }
+      tcf();
+
+      window["rdd"] = function(ts){
+         var val = $(ts).val();
+        //console.log(val);
+        qt = val;
+      }
+      window["getTime"] = function(t)
+      {
+         var v = $(t).val(); 
+         var ms = new Date();
+
+        if(v == "minute")
+        {
+           ms.setMinutes(ms.getMinutes() - qt);
+        }
+
+        if(v == "hour")
+        {
+           ms.setHours(ms.getHours() - qt);
+        }
+
+        if(v == "day")
+        {
+           ms.setDate(ms.getDate() - qt);
+        }
+
+        if(v == "week")
+        {
+           ms.setDate(ms.getDate() - 7*qt);
+        }
+
+        if(v == "month")
+        {
+           ms.setMonth(ms.getMonth() - qt);
+        }
+
+        if(v == "year")
+        {
+           ms.setFullYear(ms.getFullYear() - qt);
+        }
+
+        var dt = ms;
+        const padL = (nr, len = 2, chr = `0`) => `${nr}`.padStart(2, chr);
+
+        var st = `${dt.getFullYear()}-${padL(dt.getMonth()+1)}-${padL(dt.getDate())}%20`
+          + `${padL(dt.getHours())}:${padL(dt.getMinutes())}:${padL(dt.getSeconds())}`;
+
+        //console.log(v , st);
+
+        if(tcp)
+        {
+           $("#km").html(st.replace("%20"," ") +" to Now"); 
+        }
+        else
+        {
+           $("#km").html(""); 
+        }
+        
+        psR = st;
+      }
+      
+      getTime($("#pst")[0]);
+      
+      function tcf()
+      {
+        var val = $("#rfr").val();
+
+        //console.log(tcp , val)
+          
+        tcR = setInterval(function()
+        {
+           if(tcp)
+           {
+               getTime($("#pst")[0]);
+               nex();
+           }
+        
+        },  parseInt(val) );
+      }
+      
+       window["live"] = function(ts)
+       {
+           var val = $(ts).is(":checked");
+
+          //console.log(val);
+           tcp = val;
+       }
+      
+       $("#gt1").on("click", function()
+       {
+          nex();
+       });
+
+      function nex()
+      {
+        var ur = "https://api.thingspeak.com/channels/"+ channel_Id + "/feeds.json?api_key=" + readKey ;
+ 
+        if(rdC > 0)
+        {
+           ur += "&results=" + rdC; 
+        }
+
+        var vn = $("#tm").is(":checked");
+
+        if(tcp)
+        {
+          ur += "&start=" + psR;
+        }
+        else if(vn == true)
+        {
+           var s1 = $("#ss1").val();
+           var s2 = $("#ss2").val();
+
+           //console.log(s1 , s2); 
+
+          if(s1 != null && s2 != null)
+          {
+             s1 = new Date(s1);
+             s2 = new Date(s2);
+
+             //console.log(s1 , s2); 
+
+             s1 = tq(s1);
+             s2 = tq(s2);
+
+             //console.log(s1 , s2); 
+
+             ur += "&start=" + s1;
+             ur += "&end=" + s2;
+            
+             function tq(ms){
+               var dt = ms;
+               const padL = (nr, len = 2, chr = `0`) => `${nr}`.padStart(2, chr);
+
+               return `${dt.getFullYear()}-${padL(dt.getMonth()+1)}-${padL(dt.getDate())}%20`
+                     + `${padL(dt.getHours())}:${padL(dt.getMinutes())}:${padL(dt.getSeconds())}`;
+             }
+          }
+        }
+
+         //console.log(ur);
+       
+         fetch(ur).then((r)=>
+             {
+                if(!tcp){ console.log(r.status) }
+                if(r.status == 200)
+                {
+                  return r.text();
+                }
+             }).then((t)=>
+           {
+              var d = JSON.parse(t);
+
+               if(!tcp){ console.log(d); } 
+
+             var rr = `<table style="width:100%; margin-top:10px; margin-bottom:10px;">
+             <tr>
+                 <th> Date </th>
+                 <th> Current </th>
+                 <th> Voltage </th>
+              </tr/>
+              `;
+
+             d.feeds.forEach((s)=>
+               {
+                 rr += `<tr>
+                 <td> `+ s.created_at + ` </td>
+                 <td> `+ s.field1 + ` </td>
+                 <td> `+ s.field2 + ` </td>
+                 </tr>`;
+                 
+               });
+
+             rr += "</table>";
+
+             $("#get").html(rr);
+           });
+      }
+       $("#sub1").on("click",function()
+       {
+           var current = $("#current").val();
+           var voltage = $("#voltage").val();
+           var ur = "https://api.thingspeak.com/update?api_key="+ writeKey+"&field1="+ current +"&field2=" + voltage;
+           fetch(ur).then((r)=>
+             {
+                console.log(r.status)
+                if(r.status == 200){
+                  alert("Success");
+                }
+               else{
+                 alert("Failed")
+               }
+             }) 
+             
+       });
+    });
+    
+  </script>
+</body>
+</html>
